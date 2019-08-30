@@ -1,0 +1,45 @@
+stages: 
+  - connect
+  - build
+  - test
+  - deploy
+
+database connection:
+  stage: connect
+  script:
+  - export PGPASSWORD=$POSTGRES_PASSWORD
+  - psql -c "\c denmark;"
+  - psql -c "alter user roger with encrypted password 'roger';"
+  - psql -c "grant all privileges on database denmark to roger;"
+ 
+#sonarqube_analysis:
+#  stage: test
+#  script: 
+#    - mvn sonar:sonar -Dsonar.host.url=$SONAR_URL -Dsonar.login=$SONAR_LOGIN
+#    # - mvn sonar:sonar -Dsonar.projectKey=shraddhasable_java-servlet-login-and-display  -Dsonar.organization=shraddhasable-github  -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=17ac251cd7362fe659d8ca5ab3474ba939648e3a
+
+build:
+  stage: build
+  script:
+    - mvn $MAVEN_CLI_OPTS compile
+
+test:
+  stage: test
+  script:
+    - mvn $MAVEN_CLI_OPTS test
+
+deploy:
+  stage: deploy
+  script:
+    - mvn $MAVEN_CLI_OPTS package
+    - cd  /home/gitlab-runner/builds/RNWYXw4n/0/shraddhasable/java-servlet-login-and-display/target/
+    - cp  /home/gitlab-runner/builds/RNWYXw4n/0/shraddhasable/java-servlet-login-and-display/target/idqlogindemo-1.0.0.war  /var/lib/tomcat8/webapps/
+    - curl -v -u admin:admin123 --upload-file /home/gitlab-runner/builds/RNWYXw4n/0/shraddhasable/java-servlet-login-and-display/target/idqlogindemo-1.0.0.war $NEXUS_PATH
+    - cd /home/gitlab-runner/builds/
+    - java -jar liquibase.jar --driver=org.postgresql.Driver --url=jdbc:postgresql://localhost:5432/denmark --changeLogFile=/home/gitlab-runner/builds/RNWYXw4n/0/shraddhasable/java-servlet-login-and-display/database/master.xml  --classpath=/home/gitlab-runner/builds/lib/postgresql-9.4-1202-jdbc41.jar --username=roger --password=roger update
+  artifacts:
+    paths:
+      - target/*.war
+  only:
+    - master
+   
